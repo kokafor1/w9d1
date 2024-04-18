@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Button from 'react-bootstrap/Button';
 import Form from 'react-bootstrap/Form';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
 import PostCard from '../components/PostCard';
-import { PostType } from '../types';
+import PostForm from '../components/PostForm';
+import { CategoryType, PostFormDataType, PostType, UserType } from '../types';
+import { getAllPosts, createPost } from '../lib/apiWrapper';
 
 
 type Sorting = {
@@ -17,41 +19,28 @@ type Sorting = {
 
 type HomeProps = {
     isLoggedIn: boolean,
-    handleClick: () => void
+    currentUser: UserType|null,
+    flashMessage: (newMessage:string, newCategory:CategoryType) => void
 }
 
-export default function Home({isLoggedIn, handleClick}: HomeProps) {
+export default function Home({isLoggedIn, currentUser, flashMessage}: HomeProps) {
 
-    const [posts, setPosts] = useState<PostType[]>([
-            {
-                author: {
-                    dateCreated: "Fri, 29 Mar 2024 16:58:44 GMT",
-                    email: "brians@codingtemple.com",
-                    firstName: "Brian",
-                    id: 1,
-                    lastName: "Stanton",
-                    username: "bstanton"
-                },
-                body: "We are alive!!!!!!",
-                dateCreated: "Fri, 29 Mar 2024 17:00:35 GMT",
-                id: 1,
-                title: "Alive"
-            },
-            {
-                author: {
-                    dateCreated: "Tue, 14 Apr 2024 16:58:44 GMT",
-                    email: "brians@codingtemple.com",
-                    firstName: "Brian",
-                    id: 1,
-                    lastName: "Stanton",
-                    username: "bstanton"
-                },
-                body: "I love React!",
-                dateCreated: "Tue, 16 Apr 2024 17:00:35 GMT",
-                id: 1,
-                title: "React"
-            },
-        ])
+    const [showForm, setShowForm] = useState(false);
+    const [posts, setPosts] = useState<PostType[]>([])
+    const [fetchPostData, setFetchPostData] = useState(true);
+
+    useEffect(() => {
+        async function fetchData(){
+            const response = await getAllPosts();
+            if (response.data){
+                let posts = response.data;
+                posts.sort( (a, b) => (new Date(a.dateCreated) > new Date(b.dateCreated)) ? 1 : -1 )
+                setPosts(posts)
+            }
+        }
+
+        fetchData();
+    }, [fetchPostData])
 
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -72,26 +61,42 @@ export default function Home({isLoggedIn, handleClick}: HomeProps) {
         setSearchTerm(e.target.value);
     }
 
+    const addNewPost = async (newPostData: PostFormDataType) => {
+        const token = localStorage.getItem('token') || '';
+        const response = await createPost(token, newPostData);
+        if (response.error){
+            flashMessage(response.error, 'danger')
+        } else if (response.data){
+            flashMessage(`${response.data.title} has been created`, 'success')
+            setShowForm(false);
+            setFetchPostData(!fetchPostData)
+        }
+    }
+
     return (
         <>
-            <h1>Hello World</h1>
-                <Button variant='primary' onClick={handleClick}>Click Me!</Button>
-                <h2>{isLoggedIn ? `Welcome Back` : 'Please Log In or Sign Up'}</h2>
-                <Row>
-                    <Col xs={12} md={8}>
-                        <Form.Control value={searchTerm} placeholder='Search Posts' onChange={handleInputChange} />
-                    </Col>
+            <h1 className="text-center">{isLoggedIn && currentUser ? `Hello ${currentUser?.firstName} ${currentUser?.lastName}` : 'Welcome to the Blog' }</h1>
+            <Row>
+                <Col xs={12} md={6}>
+                    <Form.Control value={searchTerm} placeholder='Search Posts' onChange={handleInputChange} />
+                </Col>
+                <Col>
+                    <Form.Select onChange={handleSelectChange}>
+                        <option>Choose Sorting Option</option>
+                        <option value="idAsc">Sort By ID ASC</option>
+                        <option value="idDesc">Sort By ID DESC</option>
+                        <option value="titleAsc">Sort By Title ASC</option>
+                        <option value="titleDesc">Sort By Title DESC</option>
+                    </Form.Select>
+                </Col>
+                {isLoggedIn && (
                     <Col>
-                        <Form.Select onChange={handleSelectChange}>
-                            <option>Choose Sorting Option</option>
-                            <option value="idAsc">Sort By ID ASC</option>
-                            <option value="idDesc">Sort By ID DESC</option>
-                            <option value="titleAsc">Sort By Title ASC</option>
-                            <option value="titleDesc">Sort By Title DESC</option>
-                        </Form.Select>
+                        <Button className='w-100' variant='success' onClick={() => setShowForm(!showForm)}>{showForm ? 'Hide Form' : 'Add Post+'}</Button>
                     </Col>
-                </Row>
-                {posts.filter(p => p.title.toLowerCase().includes(searchTerm.toLowerCase())).map( p => <PostCard key={p.id} post={p}/> )}
+                )}
+            </Row>
+            { showForm && <PostForm addNewPost={addNewPost} /> }
+            {posts.filter(p => p.title.toLowerCase().includes(searchTerm.toLowerCase())).map( p => <PostCard key={p.id} post={p} currentUser={currentUser}/> )}
         </>
     )
 }
