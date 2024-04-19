@@ -113,6 +113,54 @@ async function createPost(token:string, postData:PostFormDataType): Promise<APIR
     return { data, error }
 }
 
+async function getPostById(postId:string|number): Promise<APIResponse<PostType>> {
+    let data;
+    let error;
+    try{
+        const response = await apiClientNoAuth().get(postEndpoint + '/' + postId)
+        data = response.data
+    } catch(err) {
+        if (axios.isAxiosError(err)){
+            error = err.response?.data.error || `Post with ${postId} does not exist`
+        } else {
+            error = 'Something went wrong'
+        }
+    }
+    return { data, error }
+}
+
+async function editPostById(postId:string|number, token:string, editedPostData:PostFormDataType): Promise<APIResponse<PostType>> {
+    let data;
+    let error;
+    try{
+        const response = await apiClientTokenAuth(token).put(postEndpoint + '/' + postId, editedPostData)
+        data = response.data
+    } catch(err) {
+        if (axios.isAxiosError(err)){
+            error = err.response?.data?.error || `Post with ID ${postId} does not exist`
+        } else {
+            error = 'Something went wrong'
+        }
+    }
+    return { data, error }
+}
+
+async function deletePostById(postId:string|number, token:string): Promise<APIResponse<string>> {
+    let data;
+    let error;
+    try{
+        const response = await apiClientTokenAuth(token).delete(postEndpoint + '/' + postId)
+        data = response.data.success
+    } catch(err) {
+        if (axios.isAxiosError(err)){
+            error = err.response?.data?.error || `Post with ID ${postId} does not exist`
+        } else {
+            error = 'Something went wrong'
+        }
+    }
+    return { data, error }
+}
+
 
 export {
     register,
@@ -120,4 +168,7 @@ export {
     login,
     getMe,
     createPost,
+    getPostById,
+    editPostById,
+    deletePostById
 }
